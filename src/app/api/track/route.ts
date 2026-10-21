@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * 埋点 API（服务端）
  * POST /api/track
  * Body: { event: string, properties?: Record<string, unknown> }
  *
- * 服务端用 service role key 调 Supabase，绕过浏览器端 RLS 限制
+ * 使用请求里的用户会话写 events 表，RLS 保证只能写自己的记录。
  */
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +15,6 @@ export async function POST(request: Request) {
     const eventName = body.event
     const properties = body.properties ?? {}
     const nickname = body.nickname ?? null
-    const userId = body.userId ?? null
 
     if (!eventName) {
       return NextResponse.json(
@@ -27,13 +23,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // 服务端创建 client，不走浏览器 session
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'unauthorized' },
+        { status: 401 }
+      )
+    }
 
     const { error } = await supabase.from('events').insert({
-      user_id: userId,
+      user_id: user.id,
       nickname,
       event_name: eventName,
       event_properties: properties,

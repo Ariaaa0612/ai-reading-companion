@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { BookOpenIcon, Loader2Icon } from 'lucide-react'
 import { track, identifyUser } from '@/lib/tracker'
+import { loginWithNickname } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
   const [nickname, setNickname] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,28 +23,26 @@ export default function LoginPage() {
       setError('请输入你的昵称')
       return
     }
+    if (password.length < 6) {
+      setError('密码至少 6 位')
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: trimmed }),
-      })
-      const data = await res.json()
+      const result = await loginWithNickname(trimmed, password)
 
-      if (data.success && data.user) {
-        // 存到 localStorage 供 AuthGuard 和 storage.ts 使用
-        localStorage.setItem('arc_nickname', data.user.nickname)
-        localStorage.setItem('arc_user_id', data.user.id)
-        // 埋点：登录成功
-        identifyUser(data.user.id, data.user.nickname)
-        void track('login', { nickname: data.user.nickname, user_id: data.user.id })
+      if (result.success) {
+        identifyUser(
+          localStorage.getItem('arc_user_id') ?? '',
+          trimmed
+        )
+        void track('login', { nickname: trimmed })
         router.replace('/')
       } else {
-        setError(data.error ?? '登录失败，请重试')
+        setError(result.error ?? '登录失败，请重试')
       }
     } catch {
       setError('网络错误，请检查网络后重试')
@@ -79,11 +79,18 @@ export default function LoginPage() {
                 maxLength={20}
                 autoFocus
               />
+              <Input
+                type="password"
+                placeholder="密码（至少 6 位）"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+              />
               {error && (
                 <p className="text-xs text-destructive">{error}</p>
               )}
             </div>
-            <Button type="submit" disabled={loading || !nickname.trim()}>
+            <Button type="submit" disabled={loading || !nickname.trim() || password.length < 6}>
               {loading ? (
                 <>
                   <Loader2Icon className="size-4 animate-spin" />
@@ -94,7 +101,7 @@ export default function LoginPage() {
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              昵称用于记录你的阅读进度和测评数据
+              首次输入昵称会自动注册，之后用同样的昵称和密码登录
             </p>
           </form>
         </CardContent>

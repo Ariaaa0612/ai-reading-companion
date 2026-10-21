@@ -10,8 +10,6 @@
  *   track('question_answered', { dimension: '批判性思维', score: 8, stage: '成长期' })
  */
 
-import { supabase, getCurrentNickname, getCurrentUserId } from '@/lib/supabase'
-
 // PostHog 配置（需要用户注册 PostHog Cloud 后填入）
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY || ''
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com'
