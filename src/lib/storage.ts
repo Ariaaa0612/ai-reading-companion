@@ -18,7 +18,7 @@ import type {
   ThinkingDimension,
   FinalScores,
 } from '@/types'
-import { supabase, getCurrentUserId } from '@/lib/supabase'
+import { getSupabaseClient, getCurrentUserId } from '@/lib/supabase'
 
 /**
  * 单条回答的综合分（用于测评/薄弱维度统计）
@@ -118,7 +118,7 @@ export const planStorage = {
       writeArray(STORAGE_KEYS.USER_PLAN, [saved])
 
       // 更新 Supabase（非关键，失败不影响）
-      await safeSupa(() => supabase.from('user_plans').update({
+      await safeSupa(() => getSupabaseClient().from('user_plans').update({
         daily_goal: plan.dailyGoal,
         weekdays: plan.weekdays,
         reminder_time: plan.reminderTime,
@@ -135,7 +135,7 @@ export const planStorage = {
       writeArray(STORAGE_KEYS.USER_PLAN, [saved])
 
       // 插入 Supabase（非关键）
-      await safeSupa(() => supabase.from('user_plans').insert({
+      await safeSupa(() => getSupabaseClient().from('user_plans').insert({
         user_id: userId,
         daily_goal: plan.dailyGoal,
         weekdays: plan.weekdays,
@@ -150,7 +150,7 @@ export const planStorage = {
   async syncFromCloud(): Promise<void> {
     try {
       const userId = getUserId()
-      const { data } = await supabase
+      const { data } = await getSupabaseClient()
         .from('user_plans')
         .select('*')
         .eq('user_id', userId)
@@ -205,7 +205,7 @@ export const recordStorage = {
       record = existing
       writeArray(STORAGE_KEYS.READING_RECORDS, records)
 
-      await safeSupa(() => supabase.from('reading_records').update({
+      await safeSupa(() => getSupabaseClient().from('reading_records').update({
         status: 'completed',
         updated_at: now,
       }).eq('user_id', userId).eq('article_id', articleId).then(r => ({ data: r.data, error: r.error as { message: string } | null })))
@@ -224,7 +224,7 @@ export const recordStorage = {
       records.push(record)
       writeArray(STORAGE_KEYS.READING_RECORDS, records)
 
-      await safeSupa(() => supabase.from('reading_records').insert({
+      await safeSupa(() => getSupabaseClient().from('reading_records').insert({
         user_id: userId,
         article_id: articleId,
         article_title: articleTitle,
@@ -269,7 +269,7 @@ export const recordStorage = {
   async syncFromCloud(): Promise<void> {
     try {
       const userId = getUserId()
-      const { data } = await supabase
+      const { data } = await getSupabaseClient()
         .from('reading_records')
         .select('*')
         .eq('user_id', userId)
@@ -337,7 +337,7 @@ export const quizStorage = {
       saved = existing
       writeArray(STORAGE_KEYS.QUIZ_ANSWERS, answers)
 
-      await safeSupa(() => supabase.from('quiz_answers').update({
+      await safeSupa(() => getSupabaseClient().from('quiz_answers').update({
         user_answer: answer.userAnswer,
         ai_analysis: answer.aiAnalysis,
         ai_score: answer.aiScore,
@@ -361,7 +361,7 @@ export const quizStorage = {
       answers.push(saved)
       writeArray(STORAGE_KEYS.QUIZ_ANSWERS, answers)
 
-      await safeSupa(() => supabase.from('quiz_answers').insert({
+      await safeSupa(() => getSupabaseClient().from('quiz_answers').insert({
         user_id: userId,
         article_id: answer.articleId,
         question_id: answer.questionId,
@@ -391,7 +391,7 @@ export const quizStorage = {
     writeArray(STORAGE_KEYS.QUIZ_ANSWERS, answers)
 
     // 更新 Supabase 中的 dialogue_turns（非关键）
-    await safeSupa(() => supabase.from('quiz_answers').update({
+    await safeSupa(() => getSupabaseClient().from('quiz_answers').update({
       dialogue_turns: existing.dialogueTurns,
     }).eq('user_id', getUserId()).eq('article_id', articleId).eq('question_id', questionId).then(r => ({ data: r.data, error: r.error as { message: string } | null })))
   },
@@ -421,7 +421,7 @@ export const quizStorage = {
 
     // 云端需先执行 supabase-schema.sql 中的 ALTER TABLE 增加 final_scores 等列；
     // 未执行前此调用会静默失败（非关键），localStorage 为主存储
-    await safeSupa(() => supabase.from('quiz_answers').update({
+    await safeSupa(() => getSupabaseClient().from('quiz_answers').update({
       final_scores: payload.finalScores,
       final_comment: payload.finalComment,
       thought_flow: payload.thoughtFlow,
@@ -440,7 +440,7 @@ export const quizStorage = {
     existing.completedAt = new Date().toISOString()
     writeArray(STORAGE_KEYS.QUIZ_ANSWERS, answers)
 
-    await safeSupa(() => supabase.from('quiz_answers').update({
+    await safeSupa(() => getSupabaseClient().from('quiz_answers').update({
       completed: true,
       completed_at: existing.completedAt,
     }).eq('user_id', getUserId()).eq('article_id', articleId).eq('question_id', questionId).then(r => ({ data: r.data, error: r.error as { message: string } | null })))
@@ -469,7 +469,7 @@ export const quizStorage = {
   async syncFromCloud(): Promise<void> {
     try {
       const userId = getUserId()
-      const { data } = await supabase
+      const { data } = await getSupabaseClient()
         .from('quiz_answers')
         .select('*')
         .eq('user_id', userId)
@@ -528,7 +528,7 @@ export const chatStorage = {
     messages.push(newMessage)
     writeArray(STORAGE_KEYS.CHAT_MESSAGES, messages)
 
-    await safeSupa(() => supabase.from('chat_messages').insert({
+    await safeSupa(() => getSupabaseClient().from('chat_messages').insert({
       user_id: userId,
       article_id: articleId,
       role,
@@ -575,7 +575,7 @@ export const assessmentStorage = {
     all.push(newAssessment)
     writeArray(STORAGE_KEYS.ASSESSMENTS, all)
 
-    await safeSupa(() => supabase.from('assessments').insert({
+    await safeSupa(() => getSupabaseClient().from('assessments').insert({
       user_id: userId,
       date: assessment.date,
       dimension_scores: assessment.dimensionScores,
@@ -614,12 +614,12 @@ export const assessmentStorage = {
 
     // 写入 Supabase（upsert，非关键）
     const userId = getUserId()
-    await safeSupa(() => supabase.from('weak_dimensions')
+    await safeSupa(() => getSupabaseClient().from('weak_dimensions')
       .delete()
       .eq('user_id', userId)
       .then(r => ({ data: r.data, error: r.error as { message: string } | null })))
 
-    await safeSupa(() => supabase.from('weak_dimensions').insert({
+    await safeSupa(() => getSupabaseClient().from('weak_dimensions').insert({
       user_id: userId,
       dimension,
       baseline_score: baselineScore,
@@ -673,7 +673,7 @@ export async function syncAllFromCloud(): Promise<void> {
     await planStorage.syncFromCloud()
 
     // 2) 阅读记录：按 (articleId) 去重合并
-    const { data: records } = await safeSupa(() => supabase
+    const { data: records } = await safeSupa(() => getSupabaseClient()
       .from('reading_records')
       .select('*')
       .eq('user_id', userId)
@@ -696,7 +696,7 @@ export async function syncAllFromCloud(): Promise<void> {
     }
 
     // 3) 思考题回答：按 (articleId + questionId) 去重合并
-    const { data: answers } = await safeSupa(() => supabase
+    const { data: answers } = await safeSupa(() => getSupabaseClient()
       .from('quiz_answers')
       .select('*')
       .eq('user_id', userId)
@@ -726,7 +726,7 @@ export async function syncAllFromCloud(): Promise<void> {
     }
 
     // 4) 对话消息：按 id 去重合并
-    const { data: messages } = await safeSupa(() => supabase
+    const { data: messages } = await safeSupa(() => getSupabaseClient()
       .from('chat_messages')
       .select('*')
       .eq('user_id', userId)
@@ -746,7 +746,7 @@ export async function syncAllFromCloud(): Promise<void> {
     }
 
     // 5) 测评结果：按 id 去重合并
-    const { data: assessments } = await safeSupa(() => supabase
+    const { data: assessments } = await safeSupa(() => getSupabaseClient()
       .from('assessments')
       .select('*')
       .eq('user_id', userId)
@@ -767,7 +767,7 @@ export async function syncAllFromCloud(): Promise<void> {
     }
 
     // 6) 薄弱维度：云端有则覆盖本地（单条）
-    const { data: weak } = await safeSupa(() => supabase
+    const { data: weak } = await safeSupa(() => getSupabaseClient()
       .from('weak_dimensions')
       .select('*')
       .eq('user_id', userId)

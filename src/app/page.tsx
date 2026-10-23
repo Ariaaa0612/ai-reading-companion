@@ -63,7 +63,7 @@ export default function HomePage() {
 
   const handleLogout = () => {
     if (window.confirm("退出将清除本机数据，下次登录会自动恢复，确定退出？")) {
-      logout();
+      void logout();
       router.replace("/login");
     }
   };
