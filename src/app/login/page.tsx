@@ -58,7 +58,7 @@ export default function LoginPage() {
           <BookOpenIcon className="size-8 text-primary" />
         </div>
         <div className="text-center">
-          <h1 className="text-xl font-semibold">AI 阅读陪伴</h1>
+          <h1 className="text-xl font-semibold">想了想</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             每天一篇好文章，五维度提升阅读思维
           </p>

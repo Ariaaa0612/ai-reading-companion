@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI 阅读陪伴",
-  description: "AI 阅读陪伴应用 —— 在阅读中提升理解力、批判性思维、联想力、表达力与反思力",
+  title: "想了想",
+  description: "想了想 —— 在阅读中提升理解力、批判性思维、联想力、表达力与反思力",
 };
 
 export default function RootLayout({
