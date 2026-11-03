@@ -8,6 +8,7 @@ on:
     branches: [master]
     paths:
       - '.github/workflows/daily-articles.yml'
+      - 'scripts/daily-articles.mjs'
   workflow_dispatch:
     inputs:
       force:

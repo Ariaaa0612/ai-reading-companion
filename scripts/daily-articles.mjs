@@ -260,7 +260,7 @@ ${list}
 - difficulty 只能取：入门、进阶、深度。
 - readingTime 是整数，3~8（分钟）。
 - tags 2~3 个短标签。
-- trendCommentary：2~3 句话，总结今天这批 news 的整体趋势。
+- trendCommentary：60~120 字，2~3 句话，总结今天这批 news 的整体趋势；必须是顶层字段，不能省略。
 - sourceUrl 必须原样使用候选里给出的 URL；source 用候选里的来源名。
 
 严格输出 JSON，不要任何解释文字、不要代码块标记，结构如下：
@@ -434,7 +434,11 @@ function validate(data, date, candidates) {
   }).filter(Boolean)
 
   data.trendCommentary = String(data.trendCommentary || '').trim()
-  if (data.trendCommentary.length < 10) errs.push('trendCommentary 过短')
+  if (data.trendCommentary.length < 20) {
+    // AI 偶尔漏写这段；不值得为一段点评丢弃整份 AI 加工稿，用兜底句补上
+    data.trendCommentary = '今日 AI 领域的进展集中在模型能力、产品落地与资本动作上，这些变化正在更快地传导到普通人的日常选择。'
+    log('AI 漏写 trendCommentary，已用兜底句补上（保留 AI 加工正文）')
+  }
 
   return { ok: errs.length === 0, errs }
 }
