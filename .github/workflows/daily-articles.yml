@@ -1,0 +1,63 @@
+name: 每日 AI 资讯
+
+# 北京时间 07:00 = UTC 23:00（前一天）
+on:
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '当天已有文件也强制重新生成'
+        type: boolean
+        default: false
+
+# 需要写权限才能把当天的 JSON 提交回仓库
+permissions:
+  contents: write
+
+# 防止手动触发和定时触发同时跑
+concurrency:
+  group: daily-articles
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 生成当日文章
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_BASE_URL: ${{ secrets.DEEPSEEK_BASE_URL }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.force }}" = "true" ]; then ARGS="--force"; fi
+          node scripts/daily-articles.mjs $ARGS
+
+      - name: 提交并推送
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add daily-articles
+
+          if git diff --cached --quiet; then
+            echo "今天没有新文件，跳过提交"
+            exit 0
+          fi
+
+          FILE=$(git diff --cached --name-only | head -1)
+          git commit -m "chore: 每日文章 $(basename "$FILE" .json)"
+
+          # 若远端有新提交，先变基再推，避免 push 被拒
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push
