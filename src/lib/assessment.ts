@@ -155,11 +155,11 @@ export function computeTrend(daily: DailyPerformance[]): TrendSummary {
   }
 }
 
-/** 模板兜底评语（AI 不可用时使用），但已包含跨天对比 */
-export function buildTemplateSummary(
-  scores: DimensionScore[],
-  trend: TrendSummary
-): string {
+/**
+ * 模板兜底评语：两条，分别对应「整体变化」和「维度强弱」两个层面。
+ * AI 不可用时使用，同样保持简洁、按点列出。
+ */
+export function buildTemplatePoints(scores: DimensionScore[], trend: TrendSummary): string[] {
   const sorted = [...scores].sort((a, b) => b.score - a.score)
   const top = sorted[0]
   const bottom = sorted[sorted.length - 1]
@@ -168,27 +168,25 @@ export function buildTemplateSummary(
       ? Math.round((scores.reduce((sum, d) => sum + d.score, 0) / scores.length) * 10) / 10
       : 0
 
-  const parts: string[] = []
-  parts.push(
-    `你已在 ${trend.dayCount} 天里累计作答，综合五维加权平均 ${avg} 分（近期表现权重更高）`
-  )
-
+  // 层面一：整体变化
+  let overall = `综合 ${trend.dayCount} 天作答，近期加权的平均分为 ${avg} 分`
   if (trend.direction === 'up' && trend.delta !== null) {
-    parts.push(`最近一天 ${trend.latestAvg} 分，比前一天的 ${trend.previousAvg} 分提高了 ${trend.delta} 分，进步可见`)
+    overall += `；最近一天 ${trend.latestAvg} 分，较前一天提高 ${trend.delta} 分`
   } else if (trend.direction === 'down' && trend.delta !== null) {
-    parts.push(`最近一天 ${trend.latestAvg} 分，比前一天的 ${trend.previousAvg} 分回落了 ${Math.abs(trend.delta)} 分，状态有波动`)
+    overall += `；最近一天 ${trend.latestAvg} 分，较前一天回落 ${Math.abs(trend.delta)} 分`
   } else if (trend.direction === 'flat') {
-    parts.push(`最近一天 ${trend.latestAvg} 分，与前一天的 ${trend.previousAvg} 分基本持平，处在平台期`)
+    overall += `；最近一天 ${trend.latestAvg} 分，与前一天的 ${trend.previousAvg} 分持平`
+  } else {
+    overall += '；目前只有一天记录，先建立基线'
   }
 
-  if (top.score >= 7) {
-    parts.push(`「${top.dimension}」最突出（${top.score} 分），是你当前的思维优势区`)
-  }
-  if (bottom.score < 6) {
-    parts.push(`「${bottom.dimension}」（${bottom.score} 分）还有较大提升空间`)
-  }
+  // 层面二：维度强弱
+  const detail =
+    top.score >= 7
+      ? `「${top.dimension}」是当前优势（${top.score} 分），「${bottom.dimension}」（${bottom.score} 分）最需要补`
+      : `各维度较均衡，「${top.dimension}」相对最好（${top.score} 分），「${bottom.dimension}」相对最弱（${bottom.score} 分）`
 
-  return parts.join('，') + '。'
+  return [overall + '。', detail + '。']
 }
 
 /** 给 AI 的输入摘要（不含原文与个人身份信息） */

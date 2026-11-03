@@ -11,7 +11,7 @@ import { assessmentStorage, quizStorage, syncAllFromCloud } from '@/lib/storage'
 import {
   DIMENSIONS,
   buildInsightPayload,
-  buildTemplateSummary,
+  buildTemplatePoints,
   computeDailyPerformance,
   computeTrend,
   computeWeightedScores,
@@ -49,18 +49,14 @@ interface ImprovementAction {
 interface AssessmentReady {
   ready: true
   dimensionScores: DimensionScore[]
-  /** 模板评语（先展示，AI 返回后替换） */
-  summary: string
-  /** AI 返回的一句话趋势 */
-  trendText: string
+  /** 综合评语：两条，分别对应「整体变化」与「维度强弱」 */
+  points: string[]
   /** AI 是否生效 */
   aiEnhanced: boolean
   /** AI 给出的可执行建议，为空时用 improvement.actions */
   aiAdvice: string[]
   dayCount: number
   improvement: ImprovementAction
-  trend: TrendSummary
-  daily: DailyPerformance[]
 }
 
 interface AssessmentNotReady {
@@ -230,73 +226,6 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
   )
 }
 
-/** 跨天趋势卡：最近 5 天的均分条形 + 与前一天的差值 */
-function TrendCard({ daily, trend }: { daily: DailyPerformance[]; trend: TrendSummary }) {
-  const recent = daily.slice(-5)
-  const deltaText =
-    trend.delta === null
-      ? null
-      : trend.direction === 'up'
-        ? `较前一天提升 ${trend.delta} 分`
-        : trend.direction === 'down'
-          ? `较前一天回落 ${Math.abs(trend.delta)} 分`
-          : `与前一天的 ${trend.previousAvg} 分基本持平`
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>跨天趋势</span>
-          <Badge variant="secondary">近 {recent.length} 天</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {deltaText && (
-          <p
-            className={`text-sm font-medium ${
-              trend.direction === 'up'
-                ? 'text-emerald-600'
-                : trend.direction === 'down'
-                  ? 'text-destructive'
-                  : 'text-muted-foreground'
-            }`}
-          >
-            {deltaText}
-          </p>
-        )}
-        <div className="flex flex-col gap-2.5">
-          {recent.map((day, idx) => {
-            const isLatest = idx === recent.length - 1
-            return (
-              <div key={day.date} className="flex items-center gap-3">
-                <span
-                  className={`w-12 shrink-0 text-xs tabular-nums ${
-                    isLatest ? 'font-semibold text-foreground' : 'text-muted-foreground'
-                  }`}
-                >
-                  {day.date.slice(5)}
-                </span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full ${isLatest ? 'bg-primary' : 'bg-primary/40'}`}
-                    style={{ width: `${Math.max(4, Math.min(100, day.avg * 10))}%` }}
-                  />
-                </div>
-                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                  {day.avg}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          综合分采用近期加权：最近一天 50%、前一天 30%、再前一天 20%，更能反映你当前的状态。
-        </p>
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function AssessmentPage() {
   const [data, setData] = useState<AssessmentData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -330,20 +259,17 @@ export default function AssessmentPage() {
       const dimensionScores = computeWeightedScores(daily)
       const trend = computeTrend(daily)
       const improvement = buildImprovement(dimensionScores)
-      const summary = buildTemplateSummary(dimensionScores, trend)
+      const points = buildTemplatePoints(dimensionScores, trend)
 
       // 先渲染本地计算结果，AI 评语异步补上
       setData({
         ready: true,
         dimensionScores,
-        summary,
-        trendText: '',
+        points,
         aiEnhanced: false,
         aiAdvice: [],
         dayCount,
         improvement,
-        trend,
-        daily,
       })
 
       // 记录薄弱维度（供 quiz/analyze 进阶期评分使用）
@@ -360,7 +286,7 @@ export default function AssessmentPage() {
       })
 
       // 异步获取 AI 综合分析（失败不影响页面）
-      void loadInsight(daily, dimensionScores, trend, dayCount, improvement)
+      void loadInsight(daily, dimensionScores, trend)
     } catch (e) {
       console.error('加载测评数据失败', e)
       setError('加载测评数据失败，请稍后重试')
@@ -372,9 +298,7 @@ export default function AssessmentPage() {
   async function loadInsight(
     daily: DailyPerformance[],
     dimensionScores: DimensionScore[],
-    trend: TrendSummary,
-    dayCount: number,
-    improvement: ImprovementAction
+    trend: TrendSummary
   ) {
     try {
       const res = await fetch('/api/assessment/insight', {
@@ -385,22 +309,18 @@ export default function AssessmentPage() {
       if (!res.ok) return
       const json = (await res.json()) as {
         ai?: boolean
-        summary?: string
-        trend?: string
+        points?: string[]
         advice?: string[]
       }
-      if (!json.ai) return
+      if (!json.ai || !Array.isArray(json.points) || json.points.length < 2) return
 
       setData((prev) => {
         if (!prev || !prev.ready) return prev
         return {
           ...prev,
-          summary: json.summary?.trim() ? json.summary.trim() : prev.summary,
-          trendText: json.trend?.trim() ?? '',
+          points: json.points!.slice(0, 2),
           aiEnhanced: true,
-          aiAdvice: Array.isArray(json.advice) ? json.advice.slice(0, 3) : [],
-          dayCount,
-          improvement,
+          aiAdvice: Array.isArray(json.advice) ? json.advice.slice(0, 2) : [],
         }
       })
     } catch (e) {
@@ -445,9 +365,6 @@ export default function AssessmentPage() {
                 </CardContent>
               </Card>
 
-              {/* 跨天趋势 */}
-              {data.daily.length >= 1 && <TrendCard daily={data.daily} trend={data.trend} />}
-
               {/* 各维度详情 */}
               <Card>
                 <CardHeader>
@@ -479,13 +396,18 @@ export default function AssessmentPage() {
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <p className="text-sm leading-relaxed text-foreground">{data.summary}</p>
-                  {data.trendText && (
-                    <p className="rounded-lg bg-primary/5 p-2.5 text-xs leading-relaxed text-primary">
-                      {data.trendText}
-                    </p>
-                  )}
+                <CardContent className="flex flex-col gap-2.5">
+                  {data.points.map((point, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2 rounded-lg bg-muted/40 p-2.5"
+                    >
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm leading-relaxed text-foreground">{point}</span>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
 
