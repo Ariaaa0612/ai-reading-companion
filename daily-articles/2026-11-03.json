@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-03",
+  "articles": [
+    {
+      "id": "20261103-001",
+      "title": "Apple Watch’s AI features for rewinding and recapping conversations begin beta testing",
+      "summary": "Now in beta: Apple's new Audio Intelligence features can help you remember what someone said or take notes on conversations.",
+      "keyPoints": [
+        "Now in beta: Apple's new Audio Intelligence features can help you remember what someone said or take notes on conversations.。",
+        "消息来自TechCrunch，原标题：Apple Watch’s AI features for rewinding and recapping conversations begin beta testing。"
+      ],
+      "source": "TechCrunch",
+      "sourceUrl": "https://techcrunch.com/2026/11/02/apple-watchs-ai-features-for-rewinding-and-recapping-conversations-begin-beta-testing/",
+      "tags": [
+        "AI",
+        "行业动态"
+      ],
+      "readingTime": 3,
+      "difficulty": "入门",
+      "thinkingQuestions": [
+        {
+          "id": "q1",
+          "question": "这条新闻里，最让你意外的变化是什么？",
+          "type": "理解力",
+          "hint": "先从文章里找出最关键的一件事，再想想它和以前有什么不同。"
+        }
+      ]
+    },
+    {
+      "id": "20261103-002",
+      "title": "消息称高盛限制交易员与银行家使用部分 AI 工具，引发员工不满",
+      "summary": "IT之家 11 月 3 日消息，据彭博社报道，高盛集团在评估效率与风险隐患后，禁止大部分员工使用面向编程的先进人工智能工具，这一举措引发部分员工不满。 此前数月，高盛允许银行从业人员在工作中使用 Anthropic PBC 的 Claude Code 以及微软公司的 GitHub。彭博新闻看到一份 10 月更新的内部指引，目前该行规定，上述工具仅限工程师使用。 一位知情人士称，这项限制令一些交易员感到沮丧。他们原本借助这些工具加快多项工作进度，例如监控客户交易流水、搭建市场波动与持仓模型、生成文字及图表材料。 就在今年 7 月，高盛首席信息官马尔科 ·",
+      "keyPoints": [
+        "IT之家 11 月 3 日消息，据彭博社报道，高盛集团在评估效率与风险隐患后，禁止大部分员工使用面向编程的先进人工智能工具，这一举措引发部分员工不满。",
+        "此前数月，高盛允许银行从业人员在工作中使用 Anthropic PBC 的 Claude Code 以及微软公司的 GitHub。",
+        "彭博新闻看到一份 10 月更新的内部指引，目前该行规定，上述工具仅限工程师使用。"
+      ],
+      "source": "IT之家",
+      "sourceUrl": "https://www.ithome.com/1/021/597.htm",
+      "tags": [
+        "AI",
+        "行业动态"
+      ],
+      "readingTime": 3,
+      "difficulty": "入门",
+      "thinkingQuestions": [
+        {
+          "id": "q1",
+          "question": "这条新闻里，最让你意外的变化是什么？",
+          "type": "理解力",
+          "hint": "先从文章里找出最关键的一件事，再想想它和以前有什么不同。"
+        }
+      ]
+    },
+    {
+      "id": "20261103-003",
+      "title": "OpenAI：极端天气下旗下美国数据中心可削减用电负荷",
+      "summary": "IT之家 11 月 3 日消息，OpenAI 当地时间周一发布公告称，将在佐治亚州埃芬厄姆县一座新建的数据中心试点推出“电网保护者计划”。该公司承诺，在极端天气或紧急状况下，最多可释放 1000 兆瓦电力，这一电量大约能够供给 70 万户家庭使用空调。 IT之家注意到，发布这份公告的背景是，美国各地对数据中心的反对声持续蔓延。不少大型项目已经启动规划与建设，当地居民往往很难、甚至完全没有机会参与意见。犹他州就出现了居民抗议事件，博克斯埃尔德县委员批准了一处数据中心项目，该项目的耗电量预计将超过该州 2025 年用电峰值需求的两倍，还会向周边的沙漠谷地排放",
+      "keyPoints": [
+        "IT之家 11 月 3 日消息，OpenAI 当地时间周一发布公告称，将在佐治亚州埃芬厄姆县一座新建的数据中心试点推出“电网保护者计划”。",
+        "该公司承诺，在极端天气或紧急状况下，最多可释放 1000 兆瓦电力，这一电量大约能够供给 70 万户家庭使用空调。",
+        "IT之家注意到，发布这份公告的背景是，美国各地对数据中心的反对声持续蔓延。"
+      ],
+      "source": "IT之家",
+      "sourceUrl": "https://www.ithome.com/1/021/588.htm",
+      "tags": [
+        "AI",
+        "行业动态"
+      ],
+      "readingTime": 3,
+      "difficulty": "入门",
+      "thinkingQuestions": [
+        {
+          "id": "q1",
+          "question": "这条新闻里，最让你意外的变化是什么？",
+          "type": "理解力",
+          "hint": "先从文章里找出最关键的一件事，再想想它和以前有什么不同。"
+        }
+      ]
+    },
+    {
+      "id": "20261103-004",
+      "title": "苹果 App Store 将推新规：约会、AI 伴侣类应用分级必须为 18+",
+      "summary": "IT之家 11 月 3 日消息，苹果今日宣布，将针对 App Store 推出全新年龄分级要求，具备位置共享功能，或提供约会和真实 / 虚拟恋爱关系服务的 App 分级必须为 18+。 从 11 月 16 日开始，开发者在 App Store Connect 填写年龄分级问卷时，必须申报应用是否包含位置共享功能，以及约会和 AI 伴侣相关功能，IT之家附官方定义如下： 位置共享（Shared Location）：与其他人或群组共享现实世界的位置信息。 约会和恋爱关系（Dating and Relationships）：支持真实用户之间建立约会或恋爱关系的",
+      "keyPoints": [
+        "IT之家 11 月 3 日消息，苹果今日宣布，将针对 App Store 推出全新年龄分级要求，具备位置共享功能，或提供约会和真实 / 虚拟恋爱关系服务的 App 分级必须为 18+。",
+        "从 11 月 16 日开始，开发者在 App Store Connect 填写年龄分级问卷时，必须申报应用是否包含位置共享功能，以及约会和 AI 伴侣相关功能，IT之家附官方定义如下： 位置共享（Shared Location）：与其他人或群组共享现实世界的位置信息。",
+        "约会和恋爱关系（Dating and Relationships）：支持真实用户之间建立约会或恋爱关系的功能， 或 / 和能够与进行性或浪漫内容互动的虚拟伴侣。"
+      ],
+      "source": "IT之家",
+      "sourceUrl": "https://www.ithome.com/1/021/586.htm",
+      "tags": [
+        "AI",
+        "行业动态"
+      ],
+      "readingTime": 3,
+      "difficulty": "入门",
+      "thinkingQuestions": [
+        {
+          "id": "q1",
+          "question": "这条新闻里，最让你意外的变化是什么？",
+          "type": "理解力",
+          "hint": "先从文章里找出最关键的一件事，再想想它和以前有什么不同。"
+        }
+      ]
+    },
+    {
+      "id": "20261103-005",
+      "title": "月之暗面 Kimi 发布游戏开发与创意工作解决方案：AI 可直接操作 Unity、虚幻引擎等",
+      "summary": "IT之家 11 月 3 日消息，月之暗面 Kimi 昨日发布「游戏开发与创意工作解决方案」。该产品基于 Kimi K3.1 系列模型、Kimi Code 与 Kimi Work 系列 Agent 产品， 以及 Unity、虚幻引擎、Blender 等专业工具插件 ，可帮助团队更快验证玩法创意、推进工程和美术制作。 据介绍，游戏开发的第一道门槛。是创意验证的成本。一个玩法是否有趣，需要真正玩起来才能判断。但制作原型需要投入时间和人力，团队往往只能优先验证少数想法。Kimi 游戏解决方案可以帮助游戏团队高效制作项目原型，在有限时间内探索和比较更多玩法方向，从",
+      "keyPoints": [
+        "IT之家 11 月 3 日消息，月之暗面 Kimi 昨日发布「游戏开发与创意工作解决方案」。",
+        "该产品基于 Kimi K3.1 系列模型、Kimi Code 与 Kimi Work 系列 Agent 产品， 以及 Unity、虚幻引擎、Blender 等专业工具插件 ，可帮助团队更快验证玩法创意、推进工程和美术制作。",
+        "据介绍，游戏开发的第一道门槛。"
+      ],
+      "source": "IT之家",
+      "sourceUrl": "https://www.ithome.com/1/021/539.htm",
+      "tags": [
+        "AI",
+        "行业动态"
+      ],
+      "readingTime": 3,
+      "difficulty": "入门",
+      "thinkingQuestions": [
+        {
+          "id": "q1",
+          "question": "这条新闻里，最让你意外的变化是什么？",
+          "type": "理解力",
+          "hint": "先从文章里找出最关键的一件事，再想想它和以前有什么不同。"
+        }
+      ]
+    }
+  ],
+  "trendCommentary": "今日 AI 领域继续围绕模型能力、产业落地和资本动作推进，值得留意的是这些变化正在更快地传导到普通人的日常选择上。"
+}
