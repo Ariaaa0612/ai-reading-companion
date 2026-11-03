@@ -7,18 +7,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import { assessmentStorage, quizStorage, getAnswerOverallScore } from '@/lib/storage'
+import { assessmentStorage, quizStorage, syncAllFromCloud } from '@/lib/storage'
+import {
+  DIMENSIONS,
+  buildInsightPayload,
+  buildTemplateSummary,
+  computeDailyPerformance,
+  computeTrend,
+  computeWeightedScores,
+  type DailyPerformance,
+  type TrendSummary,
+} from '@/lib/assessment'
 import { track } from '@/lib/tracker'
 import type { DimensionScore, ThinkingDimension } from '@/types'
 
 // ===== 雷达图配置 =====
-const DIMENSIONS_ORDER: ThinkingDimension[] = [
-  '理解力',
-  '批判性思维',
-  '联想力',
-  '表达力',
-  '反思力',
-]
+const DIMENSIONS_ORDER: ThinkingDimension[] = DIMENSIONS
 
 const DIMENSION_DESC: Record<ThinkingDimension, string> = {
   理解力: '准确概括文章核心，用自己的话复述要点',
@@ -45,9 +49,18 @@ interface ImprovementAction {
 interface AssessmentReady {
   ready: true
   dimensionScores: DimensionScore[]
+  /** 模板评语（先展示，AI 返回后替换） */
   summary: string
+  /** AI 返回的一句话趋势 */
+  trendText: string
+  /** AI 是否生效 */
+  aiEnhanced: boolean
+  /** AI 给出的可执行建议，为空时用 improvement.actions */
+  aiAdvice: string[]
   dayCount: number
   improvement: ImprovementAction
+  trend: TrendSummary
+  daily: DailyPerformance[]
 }
 
 interface AssessmentNotReady {
@@ -58,39 +71,8 @@ interface AssessmentNotReady {
 
 type AssessmentData = AssessmentReady | AssessmentNotReady
 
-// ===== 客户端兜底计算（当服务端无法读取 localStorage 时使用） =====
-function computeClientScores(): DimensionScore[] {
-  return DIMENSIONS_ORDER.map((dimension) => {
-    const answers = quizStorage.listByDimension(dimension)
-    const scores = answers
-      .map((a) => getAnswerOverallScore(a))
-      .filter((s): s is number => s !== null)
-    if (scores.length === 0) return { dimension, score: 5 }
-    const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length
-    return { dimension, score: Math.round(avg * 10) / 10 }
-  })
-}
-
-function buildClientSummary(scores: DimensionScore[], dayCount: number): string {
-  const sorted = [...scores].sort((a, b) => b.score - a.score)
-  const top = sorted[0]
-  const bottom = sorted[sorted.length - 1]
-  const avg = Math.round((scores.reduce((sum, d) => sum + d.score, 0) / scores.length) * 10) / 10
-  const parts: string[] = [`你已坚持阅读 ${dayCount} 天，五维度平均分 ${avg} 分`]
-  if (top.score >= 7) {
-    parts.push(`其中「${top.dimension}」表现最突出（${top.score} 分），是你当前的思维优势区`)
-  } else {
-    parts.push('整体处于稳步积累阶段，各项能力相对均衡')
-  }
-  if (bottom.score < 6) {
-    parts.push(`「${bottom.dimension}」（${bottom.score} 分）还有较大提升空间`)
-  }
-  parts.push('建议在保持优势的同时，针对薄弱维度多做刻意练习')
-  return parts.join('，') + '。'
-}
-
-/** 客户端兜底：根据最薄弱维度生成个性化提升指南 */
-function buildClientImprovement(scores: DimensionScore[]): ImprovementAction {
+/** 根据最薄弱维度生成个性化提升指南 */
+function buildImprovement(scores: DimensionScore[]): ImprovementAction {
   const sorted = [...scores].sort((a, b) => a.score - b.score)
   const weakest = sorted[0]
 
@@ -133,11 +115,7 @@ function buildClientImprovement(scores: DimensionScore[]): ImprovementAction {
   }
 
   const guide = guides[weakest.dimension]
-  return {
-    dimension: weakest.dimension,
-    title: guide.title,
-    actions: guide.actions,
-  }
+  return { dimension: weakest.dimension, title: guide.title, actions: guide.actions }
 }
 
 // ===== 雷达图几何计算 =====
@@ -164,18 +142,16 @@ function dataPoints(scores: number[]): string {
 
 function labelAnchor(i: number): { anchor: 'start' | 'middle' | 'end'; dy: number } {
   const p = vertex(i, 1)
-  // 根据 x 方向决定水平对齐
   let anchor: 'start' | 'middle' | 'end' = 'middle'
   if (p.x > CX + 0.3) anchor = 'start'
   else if (p.x < CX - 0.3) anchor = 'end'
-  // 顶部标签上移，底部下移
   const dy = p.y < CY - 0.3 ? -6 : p.y > CY + 0.3 ? 14 : 4
   return { anchor, dy }
 }
 
 function RadarChart({ scores }: { scores: DimensionScore[] }) {
   const scoreByDim = new Map(scores.map((d) => [d.dimension, d.score]))
-  const ordered = DIMENSIONS_ORDER.map((d) => scoreByDim.get(d) ?? 50)
+  const ordered = DIMENSIONS_ORDER.map((d) => scoreByDim.get(d) ?? 0)
   const gridLevels = [0.2, 0.4, 0.6, 0.8, 1]
 
   return (
@@ -185,7 +161,6 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
       role="img"
       aria-label="五维度能力雷达图"
     >
-      {/* 背景同心五边形 */}
       {gridLevels.map((lvl) => (
         <polygon
           key={lvl}
@@ -196,7 +171,6 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
         />
       ))}
 
-      {/* 轴线 */}
       {DIMENSIONS_ORDER.map((_, i) => {
         const p = vertex(i, R)
         return (
@@ -212,7 +186,6 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
         )
       })}
 
-      {/* 数据多边形 */}
       <polygon
         points={dataPoints(ordered)}
         fill="oklch(0.55 0.18 250 / 0.25)"
@@ -221,17 +194,15 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
         strokeLinejoin="round"
       />
 
-      {/* 数据点 */}
       {ordered.map((s, i) => {
         const p = vertex(i, R * (Math.max(0, Math.min(10, s)) / 10))
         return <circle key={i} cx={p.x} cy={p.y} r={3.5} fill="oklch(0.55 0.18 250)" />
       })}
 
-      {/* 顶点标签：维度名 + 分数 */}
       {DIMENSIONS_ORDER.map((dim, i) => {
         const p = vertex(i, R + 18)
         const { anchor, dy } = labelAnchor(i)
-        const score = scoreByDim.get(dim) ?? 50
+        const score = scoreByDim.get(dim) ?? 0
         return (
           <g key={dim}>
             <text
@@ -259,6 +230,73 @@ function RadarChart({ scores }: { scores: DimensionScore[] }) {
   )
 }
 
+/** 跨天趋势卡：最近 5 天的均分条形 + 与前一天的差值 */
+function TrendCard({ daily, trend }: { daily: DailyPerformance[]; trend: TrendSummary }) {
+  const recent = daily.slice(-5)
+  const deltaText =
+    trend.delta === null
+      ? null
+      : trend.direction === 'up'
+        ? `较前一天提升 ${trend.delta} 分`
+        : trend.direction === 'down'
+          ? `较前一天回落 ${Math.abs(trend.delta)} 分`
+          : `与前一天的 ${trend.previousAvg} 分基本持平`
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>跨天趋势</span>
+          <Badge variant="secondary">近 {recent.length} 天</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {deltaText && (
+          <p
+            className={`text-sm font-medium ${
+              trend.direction === 'up'
+                ? 'text-emerald-600'
+                : trend.direction === 'down'
+                  ? 'text-destructive'
+                  : 'text-muted-foreground'
+            }`}
+          >
+            {deltaText}
+          </p>
+        )}
+        <div className="flex flex-col gap-2.5">
+          {recent.map((day, idx) => {
+            const isLatest = idx === recent.length - 1
+            return (
+              <div key={day.date} className="flex items-center gap-3">
+                <span
+                  className={`w-12 shrink-0 text-xs tabular-nums ${
+                    isLatest ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {day.date.slice(5)}
+                </span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full ${isLatest ? 'bg-primary' : 'bg-primary/40'}`}
+                    style={{ width: `${Math.max(4, Math.min(100, day.avg * 10))}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {day.avg}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          综合分采用近期加权：最近一天 50%、前一天 30%、再前一天 20%，更能反映你当前的状态。
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AssessmentPage() {
   const [data, setData] = useState<AssessmentData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -272,65 +310,57 @@ export default function AssessmentPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/assessment')
-      const json = (await res.json()) as {
-        ready?: boolean
-        daysNeeded?: number
-        currentDays?: number
-        dimensionScores?: DimensionScore[]
-        summary?: string
-        dayCount?: number
-        improvement?: ImprovementAction
+      // 关键修复：先同步云端，跨设备/跨域名也能拿到历史作答
+      try {
+        await syncAllFromCloud()
+      } catch (e) {
+        console.warn('[assessment] syncAllFromCloud skipped:', e)
       }
 
-      if (json.ready === true && json.dimensionScores) {
-        // 客户端存储薄弱维度（服务端无法写入 localStorage）
-        const sorted = [...json.dimensionScores].sort((a, b) => a.score - b.score)
-        void assessmentStorage.setWeakDimension(sorted[0].dimension, sorted[0].score)
+      const answers = quizStorage.list()
+      const daily = computeDailyPerformance(answers)
+      const usageDays = assessmentStorage.getUsageDays()
+      const dayCount = Math.max(usageDays, daily.length)
 
-        setData({
-          ready: true,
-          dimensionScores: json.dimensionScores,
-          summary: json.summary ?? '',
-          dayCount: json.dayCount ?? 0,
-          improvement: json.improvement ?? buildClientImprovement(json.dimensionScores),
-        })
-        // 埋点：查看测评
-        void track('assessment_viewed', {
-          day_count: json.dayCount ?? 0,
-          weakest_dimension: sorted[0]?.dimension,
-          weakest_score: sorted[0]?.score,
-          avg_score: (json.dimensionScores.reduce((s, d) => s + d.score, 0) / json.dimensionScores.length).toFixed(1),
-        })
-        return
-      }
-
-      // 服务端返回未就绪：若有真实 currentDays（未来接入服务端存储时），直接尊重
-      const serverDays = typeof json.currentDays === 'number' ? json.currentDays : 0
-      if (serverDays > 0) {
-        setData({
-          ready: false,
-          daysNeeded: json.daysNeeded ?? REQUIRED_DAYS,
-          currentDays: serverDays,
-        })
-        return
-      }
-
-      // currentDays === 0：MVP 阶段服务端无法读取 localStorage，回退到客户端计算
-      const dayCount = assessmentStorage.getUsageDays()
-      if (dayCount >= REQUIRED_DAYS) {
-        const dimensionScores = computeClientScores()
-        const summary = buildClientSummary(dimensionScores, dayCount)
-        const improvement = buildClientImprovement(dimensionScores)
-
-        // 客户端兜底：同样存储薄弱维度
-        const sorted = [...dimensionScores].sort((a, b) => a.score - b.score)
-        void assessmentStorage.setWeakDimension(sorted[0].dimension, sorted[0].score)
-
-        setData({ ready: true, dimensionScores, summary, dayCount, improvement })
-      } else {
+      if (dayCount < REQUIRED_DAYS || daily.length === 0) {
         setData({ ready: false, daysNeeded: REQUIRED_DAYS, currentDays: dayCount })
+        return
       }
+
+      const dimensionScores = computeWeightedScores(daily)
+      const trend = computeTrend(daily)
+      const improvement = buildImprovement(dimensionScores)
+      const summary = buildTemplateSummary(dimensionScores, trend)
+
+      // 先渲染本地计算结果，AI 评语异步补上
+      setData({
+        ready: true,
+        dimensionScores,
+        summary,
+        trendText: '',
+        aiEnhanced: false,
+        aiAdvice: [],
+        dayCount,
+        improvement,
+        trend,
+        daily,
+      })
+
+      // 记录薄弱维度（供 quiz/analyze 进阶期评分使用）
+      const sorted = [...dimensionScores].sort((a, b) => a.score - b.score)
+      void assessmentStorage.setWeakDimension(sorted[0].dimension, sorted[0].score)
+
+      void track('assessment_viewed', {
+        day_count: dayCount,
+        weakest_dimension: sorted[0]?.dimension,
+        weakest_score: sorted[0]?.score,
+        avg_score: (
+          dimensionScores.reduce((s, d) => s + d.score, 0) / dimensionScores.length
+        ).toFixed(1),
+      })
+
+      // 异步获取 AI 综合分析（失败不影响页面）
+      void loadInsight(daily, dimensionScores, trend, dayCount, improvement)
     } catch (e) {
       console.error('加载测评数据失败', e)
       setError('加载测评数据失败，请稍后重试')
@@ -339,12 +369,51 @@ export default function AssessmentPage() {
     }
   }
 
+  async function loadInsight(
+    daily: DailyPerformance[],
+    dimensionScores: DimensionScore[],
+    trend: TrendSummary,
+    dayCount: number,
+    improvement: ImprovementAction
+  ) {
+    try {
+      const res = await fetch('/api/assessment/insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildInsightPayload(daily, dimensionScores, trend)),
+      })
+      if (!res.ok) return
+      const json = (await res.json()) as {
+        ai?: boolean
+        summary?: string
+        trend?: string
+        advice?: string[]
+      }
+      if (!json.ai) return
+
+      setData((prev) => {
+        if (!prev || !prev.ready) return prev
+        return {
+          ...prev,
+          summary: json.summary?.trim() ? json.summary.trim() : prev.summary,
+          trendText: json.trend?.trim() ?? '',
+          aiEnhanced: true,
+          aiAdvice: Array.isArray(json.advice) ? json.advice.slice(0, 3) : [],
+          dayCount,
+          improvement,
+        }
+      })
+    } catch (e) {
+      console.warn('[assessment] insight failed (non-critical):', e)
+    }
+  }
+
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-20">
       {/* 标题 */}
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <h1 className="text-lg font-semibold">阅读能力测评</h1>
-        <p className="text-xs text-muted-foreground">五维度透视你的阅读思维</p>
+        <p className="text-xs text-muted-foreground">基于全部作答、近期表现加权</p>
       </header>
 
       <ScrollArea className="h-[calc(100vh-64px)]">
@@ -376,6 +445,9 @@ export default function AssessmentPage() {
                 </CardContent>
               </Card>
 
+              {/* 跨天趋势 */}
+              {data.daily.length >= 1 && <TrendCard daily={data.daily} trend={data.trend} />}
+
               {/* 各维度详情 */}
               <Card>
                 <CardHeader>
@@ -397,13 +469,23 @@ export default function AssessmentPage() {
                 </CardContent>
               </Card>
 
-              {/* 总评语 */}
+              {/* 总评（AI 综合 / 模板兜底） */}
               <Card>
                 <CardHeader>
-                  <CardTitle>总评</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>综合评语</span>
+                    <Badge variant={data.aiEnhanced ? 'default' : 'secondary'} className="text-xs">
+                      {data.aiEnhanced ? 'AI 综合分析' : '本地分析'}
+                    </Badge>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col gap-3">
                   <p className="text-sm leading-relaxed text-foreground">{data.summary}</p>
+                  {data.trendText && (
+                    <p className="rounded-lg bg-primary/5 p-2.5 text-xs leading-relaxed text-primary">
+                      {data.trendText}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -418,21 +500,21 @@ export default function AssessmentPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {data.improvement.title}
-                  </p>
+                  <p className="text-sm font-medium text-foreground">{data.improvement.title}</p>
                   <div className="flex flex-col gap-2">
-                    {data.improvement.actions.map((action, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-2 rounded-lg bg-primary/5 p-2.5"
-                      >
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                          {idx + 1}
-                        </span>
-                        <span className="text-sm leading-relaxed text-foreground">{action}</span>
-                      </div>
-                    ))}
+                    {(data.aiAdvice.length > 0 ? data.aiAdvice : data.improvement.actions).map(
+                      (action, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 rounded-lg bg-primary/5 p-2.5"
+                        >
+                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm leading-relaxed text-foreground">{action}</span>
+                        </div>
+                      )
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     从最薄弱的维度开始练，每次只做一件事，效果最明显。

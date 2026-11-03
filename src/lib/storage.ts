@@ -650,7 +650,12 @@ export const assessmentStorage = {
 
 // ===== 合并工具：以云端为权威补齐本地缺失项，本地已有则保留本地（去重合并） =====
 
-function mergeByIdentity<T extends { id?: string }>(localArr: T[], cloudArr: T[], identity: (item: T) => string): T[] {
+function mergeByIdentity<T extends { id?: string }>(
+  localArr: T[],
+  cloudArr: T[],
+  identity: (item: T) => string,
+  prefer?: (local: T, cloud: T) => T
+): T[] {
   const localMap = new Map<string, T>()
   for (const item of localArr) {
     const key = identity(item)
@@ -658,7 +663,14 @@ function mergeByIdentity<T extends { id?: string }>(localArr: T[], cloudArr: T[]
   }
   for (const item of cloudArr) {
     const key = identity(item)
-    if (key && !localMap.has(key)) localMap.set(key, item)
+    if (!key) continue
+    const existing = localMap.get(key)
+    if (!existing) {
+      localMap.set(key, item)
+      continue
+    }
+    // 同一道题两边都有：默认保留本地，传了 prefer 时按"更完整/更新"的一侧取胜
+    if (prefer) localMap.set(key, prefer(existing, item))
   }
   return Array.from(localMap.values())
 }
@@ -691,7 +703,15 @@ export async function syncAllFromCloud(): Promise<void> {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       }))
-      const merged = mergeByIdentity(localRecords, cloudRecords, (r) => r.articleId)
+      const merged = mergeByIdentity(localRecords, cloudRecords, (r) => r.articleId, (local, cloud) => {
+        // 已完成优先于未完成；都完成则取更新时间较新的那份
+        const localDone = local.status === 'completed'
+        const cloudDone = cloud.status === 'completed'
+        if (localDone !== cloudDone) return cloudDone ? cloud : local
+        const localStamp = local.updatedAt ?? local.createdAt ?? ''
+        const cloudStamp = cloud.updatedAt ?? cloud.createdAt ?? ''
+        return cloudStamp > localStamp ? cloud : local
+      })
       writeArray(STORAGE_KEYS.READING_RECORDS, merged)
     }
 
@@ -721,7 +741,13 @@ export async function syncAllFromCloud(): Promise<void> {
         finalComment: a.final_comment,
         thoughtFlow: a.thought_flow,
       }))
-      const merged = mergeByIdentity(localAnswers, cloudAnswers, (a) => `${a.articleId}_${a.questionId}`)
+      const merged = mergeByIdentity(localAnswers, cloudAnswers, (a) => `${a.articleId}_${a.questionId}`, (local, cloud) => {
+        // 已完成优先于未完成；都完成则取时间更新的那份
+        if (local.completed !== cloud.completed) return cloud.completed ? cloud : local
+        const localStamp = local.completedAt ?? local.createdAt ?? ''
+        const cloudStamp = cloud.completedAt ?? cloud.createdAt ?? ''
+        return cloudStamp > localStamp ? cloud : local
+      })
       writeArray(STORAGE_KEYS.QUIZ_ANSWERS, merged)
     }
 
